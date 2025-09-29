@@ -66,29 +66,49 @@ function App() {
   useEffect(() => {
     if (!selectedLocationId) {
       setLocationDetails(null);
-      return;
+      setDetailsError(null);
+      setDetailsLoading(false);
+      return () => {};
     }
+
+    const controller = new AbortController();
+    let isCurrent = true;
 
     const fetchDetails = async () => {
       setDetailsLoading(true);
       setDetailsError(null);
       try {
-        const response = await fetch(`/api/locations/${selectedLocationId}`);
+        const response = await fetch(`/api/locations/${selectedLocationId}`, {
+          signal: controller.signal,
+        });
         if (!response.ok) {
           const body = await response.json().catch(() => ({}));
           throw new Error(body?.message || 'Failed to fetch location details');
         }
         const data = await response.json();
+        if (!isCurrent || controller.signal.aborted) {
+          return;
+        }
         setLocationDetails(data);
       } catch (err) {
+        if (!isCurrent || controller.signal.aborted) {
+          return;
+        }
         setDetailsError(err.message || 'Unexpected error');
         setLocationDetails(null);
       } finally {
-        setDetailsLoading(false);
+        if (isCurrent && !controller.signal.aborted) {
+          setDetailsLoading(false);
+        }
       }
     };
 
     fetchDetails();
+
+    return () => {
+      isCurrent = false;
+      controller.abort();
+    };
   }, [selectedLocationId]);
 
   const orderedLocations = useMemo(() => locations, [locations]);
