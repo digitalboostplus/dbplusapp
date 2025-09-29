@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
 
 const PAGE_SIZE = 100;
@@ -38,9 +38,15 @@ function App() {
 
   const debouncedEmail = useDebouncedValue(emailFilter, 400);
 
-  const loadLocations = async (params = {}) => {
+  const locationsRequestRef = useRef(0);
+
+  const loadLocations = useCallback(async (params = {}) => {
+    const requestId = locationsRequestRef.current + 1;
+    locationsRequestRef.current = requestId;
+
     setIsLoading(true);
     setError(null);
+
     try {
       const query = buildQueryString({ ...params, all: 'true', limit: PAGE_SIZE });
       const response = await fetch(`/api/locations?${query}`);
@@ -48,48 +54,89 @@ function App() {
         const body = await response.json().catch(() => ({}));
         throw new Error(body?.message || 'Failed to fetch locations');
       }
+
       const data = await response.json();
+      if (requestId !== locationsRequestRef.current) {
+        return;
+      }
+
       setLocations(data.locations || []);
       setLastLoaded(new Date());
     } catch (err) {
+      if (requestId !== locationsRequestRef.current) {
+        return;
+      }
+
       setError(err.message || 'Unexpected error');
       setLocations([]);
     } finally {
-      setIsLoading(false);
+      if (requestId === locationsRequestRef.current) {
+        setIsLoading(false);
+      }
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadLocations({ email: debouncedEmail, order });
-  }, [debouncedEmail, order]);
 
-  useEffect(() => {
-    if (!selectedLocationId) {
-      setLocationDetails(null);
-      return;
-    }
+    return () => {
+      locationsRequestRef.current += 1;
+    };
+  }, [debouncedEmail, order, loadLocations]);
 
-    const fetchDetails = async () => {
+  const detailsRequestRef = useRef(0);
+
+  const fetchDetails = useCallback(
+    async (locationId) => {
+      const requestId = detailsRequestRef.current + 1;
+      detailsRequestRef.current = requestId;
+
+      if (!locationId) {
+        setLocationDetails(null);
+        setDetailsError(null);
+        setDetailsLoading(false);
+        return;
+      }
+
       setDetailsLoading(true);
       setDetailsError(null);
+
       try {
-        const response = await fetch(`/api/locations/${selectedLocationId}`);
+        const response = await fetch(`/api/locations/${locationId}`);
         if (!response.ok) {
           const body = await response.json().catch(() => ({}));
           throw new Error(body?.message || 'Failed to fetch location details');
         }
+
         const data = await response.json();
+        if (requestId !== detailsRequestRef.current) {
+          return;
+        }
+
         setLocationDetails(data);
       } catch (err) {
+        if (requestId !== detailsRequestRef.current) {
+          return;
+        }
+
         setDetailsError(err.message || 'Unexpected error');
         setLocationDetails(null);
       } finally {
-        setDetailsLoading(false);
+        if (requestId === detailsRequestRef.current) {
+          setDetailsLoading(false);
+        }
       }
-    };
+    },
+    []
+  );
 
-    fetchDetails();
-  }, [selectedLocationId]);
+  useEffect(() => {
+    fetchDetails(selectedLocationId);
+
+    return () => {
+      detailsRequestRef.current += 1;
+    };
+  }, [selectedLocationId, fetchDetails]);
 
   const orderedLocations = useMemo(() => locations, [locations]);
 
