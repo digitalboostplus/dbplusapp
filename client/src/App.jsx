@@ -166,11 +166,11 @@ function App() {
                     className={location.id === selectedLocationId ? 'selected' : ''}
                     onClick={() => setSelectedLocationId(location.id)}
                   >
-                    <td>{location.name || '—'}</td>
-                    <td>{location.email || '—'}</td>
-                    <td>{location.phone || '—'}</td>
-                    <td>{location.city || '—'}</td>
-                    <td>{location.state || '—'}</td>
+                    <td data-label="Name">{location.name || '—'}</td>
+                    <td data-label="Email">{location.email || '—'}</td>
+                    <td data-label="Phone">{location.phone || '—'}</td>
+                    <td data-label="City">{location.city || '—'}</td>
+                    <td data-label="State">{location.state || '—'}</td>
                   </tr>
                 ))}
               </tbody>
