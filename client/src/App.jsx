@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
 
 const PAGE_SIZE = 100;
@@ -38,30 +38,53 @@ function App() {
 
   const debouncedEmail = useDebouncedValue(emailFilter, 400);
 
-  const loadLocations = async (params = {}) => {
+  const activeRequestRef = useRef(null);
+
+  const loadLocations = useCallback(async (params = {}) => {
+    const controller = new AbortController();
+    activeRequestRef.current?.abort();
+    activeRequestRef.current = controller;
+
     setIsLoading(true);
     setError(null);
+
     try {
       const query = buildQueryString({ ...params, all: 'true', limit: PAGE_SIZE });
-      const response = await fetch(`/api/locations?${query}`);
+      const response = await fetch(`/api/locations?${query}`, { signal: controller.signal });
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
         throw new Error(body?.message || 'Failed to fetch locations');
       }
       const data = await response.json();
+      if (activeRequestRef.current !== controller) {
+        return;
+      }
       setLocations(data.locations || []);
       setLastLoaded(new Date());
     } catch (err) {
+      if (err.name === 'AbortError') {
+        return;
+      }
+      if (activeRequestRef.current !== controller) {
+        return;
+      }
       setError(err.message || 'Unexpected error');
       setLocations([]);
     } finally {
-      setIsLoading(false);
+      if (activeRequestRef.current === controller) {
+        setIsLoading(false);
+        activeRequestRef.current = null;
+      }
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadLocations({ email: debouncedEmail, order });
-  }, [debouncedEmail, order]);
+    return () => {
+      activeRequestRef.current?.abort();
+      activeRequestRef.current = null;
+    };
+  }, [debouncedEmail, order, loadLocations]);
 
   useEffect(() => {
     if (!selectedLocationId) {
