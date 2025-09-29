@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import LocationDetailSkeleton from './components/LocationDetailSkeleton';
+import LocationTableSkeleton from './components/LocationTableSkeleton';
 import './App.css';
 
 const PAGE_SIZE = 100;
@@ -142,6 +144,7 @@ function App() {
             {error && <span className="status-badge error">{error}</span>}
           </div>
           <div className="table-wrapper">
+            {isLoading && <LocationTableSkeleton />}
             <table>
               <thead>
                 <tr>
@@ -185,7 +188,7 @@ function App() {
             {detailsError && <span className="status-badge error">{detailsError}</span>}
           </div>
           {!selectedLocationId && <p className="placeholder">Select a location to inspect its profile.</p>}
-          {selectedLocationId && !detailsLoading && !detailsError && locationDetails && (
+          {selectedLocationId && !detailsError && locationDetails && (
             <dl className="details-grid">
               <div>
                 <dt>Name</dt>
@@ -237,6 +240,7 @@ function App() {
               </div>
             </dl>
           )}
+          {selectedLocationId && detailsLoading && <LocationDetailSkeleton />}
         </section>
       </main>
     </div>
